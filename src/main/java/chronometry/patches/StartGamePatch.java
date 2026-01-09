@@ -75,8 +75,9 @@ public class StartGamePatch {
   
   @SpirePatch(clz = NeowRoom.class, method = "renderAboveTopPanel")
   public static class RenderNeowVotes {
-    public static void Postfix(NeowRoom self, SpriteBatch sb) {
+    public static SpireReturn<Void> Prefix(NeowRoom self, SpriteBatch sb) {
       StartGamePatch.renderTwitchVotes(sb);
+      return SpireReturn.Return(null);
     }
   }
   
@@ -208,7 +209,6 @@ public class StartGamePatch {
     }
     SlayTheStreamer.log("renderTwitchVotes - isVoting is true, checking voter");
     if (getVoter().isPresent()) {
-      SlayTheStreamer.log("Rendering real Twitch votes");
       TwitchVoter twitchVoter = (TwitchVoter)getVoter().get();
       TwitchVoteOption[] options = twitchVoter.getOptions();
       int sum = ((Integer)Arrays.stream(options).map(c -> Integer.valueOf(c.voteCount)).reduce(Integer.valueOf(0), Integer::sum)).intValue();

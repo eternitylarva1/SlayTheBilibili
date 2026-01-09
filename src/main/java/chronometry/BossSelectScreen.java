@@ -13,6 +13,7 @@
  import com.megacrit.cardcrawl.core.CardCrawlGame;
  import com.megacrit.cardcrawl.core.Settings;
  import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
+ import com.megacrit.cardcrawl.dungeons.TheCity;
  import com.megacrit.cardcrawl.helpers.FontHelper;
  import com.megacrit.cardcrawl.helpers.ImageMaster;
  import com.megacrit.cardcrawl.helpers.MonsterHelper;
@@ -152,14 +153,26 @@
      AbstractDungeon.screen = BossChoicePatch.BOSS_SELECT;
      AbstractDungeon.overlayMenu.proceedButton.hide();
      AbstractDungeon.overlayMenu.showBlackScreen();
- 
      
-     for (int i = 0; i < 3; i++) {
-       AbstractMonster m = getBoss((String)AbstractDungeon.bossList.get(i));
-       m.drawX = ((Float)monsterX.get(i)).floatValue();
-       m.drawY = ((Float)monsterY.get(i)).floatValue() - 42.0F * Settings.scale;
+     int bossCount = AbstractDungeon.bossList.size();
+     SlayTheStreamer.log("BossSelectScreen: Creating " + bossCount + " bosses");
+     
+     for (int i = 0; i < bossCount; i++) {
+       String bossID = (String)AbstractDungeon.bossList.get(i);
+       AbstractMonster m = getBoss(bossID);
+       if (m == null) {
+         SlayTheStreamer.log("BossSelectScreen: Failed to create boss for ID: " + bossID);
+         continue;
+       }
+       // Use available positions, but don't exceed the array bounds
+       if (i < monsterX.size() && i < monsterY.size()) {
+         m.drawX = ((Float)monsterX.get(i)).floatValue();
+         m.drawY = ((Float)monsterY.get(i)).floatValue() - 42.0F * Settings.scale;
+       } else {
+         SlayTheStreamer.log("BossSelectScreen: Warning: Not enough positions for boss " + i);
+       }
        this.bosses.add(m);
-     } 
+     }
  
      
      this.mayVote = true;
@@ -206,19 +219,24 @@
        MonsterGroup bossGroup = MonsterHelper.getEncounter(bossID);
        if (bossGroup.monsters.size() == 1)
        {
-         return (AbstractMonster)bossGroup.monsters.get(0);
+         AbstractMonster m = (AbstractMonster)bossGroup.monsters.get(0);
+         SlayTheStreamer.log("BossSelectScreen: Created boss " + bossID + " from MonsterHelper, hb is null: " + (m.hb == null));
+         return m;
        }
        
        for (AbstractMonster mo : bossGroup.monsters) {
          
          if (mo.type == AbstractMonster.EnemyType.BOSS)
          {
+           SlayTheStreamer.log("BossSelectScreen: Created boss " + bossID + " from MonsterHelper (BOSS type), hb is null: " + (mo.hb == null));
            return mo;
          }
-       } 
+       }
        
-       return (AbstractMonster)bossGroup.monsters.get(0);
-     } 
+       AbstractMonster m = (AbstractMonster)bossGroup.monsters.get(0);
+       SlayTheStreamer.log("BossSelectScreen: Created boss " + bossID + " from MonsterHelper (first monster), hb is null: " + (m.hb == null));
+       return m;
+     }
      
      return null;
    }
@@ -245,10 +263,24 @@
      sb.draw(this.smokeImg, 470.0F * Settings.scale, AbstractDungeon.floorY - 258.0F * Settings.scale, this.smokeImg.getWidth() * Settings.scale, this.smokeImg.getHeight() * Settings.scale);
      
      for (AbstractMonster m : this.bosses) {
-       m.render(sb);
+       if (m != null) {
+         if (m.hb == null) {
+           SlayTheStreamer.log("BossSelectScreen: Skipping monster " + m.name + " (ID: " + m.id + ") because hb is null");
+           continue;
+         }
+         try {
+           m.render(sb);
+         } catch (Exception e) {
+           // Only log once per monster to reduce console spam
+           if (!m.name.startsWith("Error logged")) {
+             SlayTheStreamer.log("BossSelectScreen: Error rendering monster " + m.name + " (ID: " + m.id + "): " + e.getMessage());
+             m.name = "Error logged: " + m.name;
+           }
+         }
+       }
      }
      
-     if (AbstractDungeon.topPanel.twitch.isPresent()) {
+     if (AbstractDungeon.topPanel.twitch.isPresent() || MockTwitchHelper.isMockMode()) {
        renderTwitchVotes(sb);
      }
    }
@@ -342,6 +374,7 @@
         if (this.mayVote && !this.isVoting) {
           String[] array = new String[AbstractDungeon.bossList.size()];
           array = (String[])AbstractDungeon.bossList.toArray(array);
+          SlayTheStreamer.log("BossSelectScreen: Boss list: " + Arrays.toString(array));
           this.isVoting = MockTwitchHelper.initiateSimpleNumberVote(array, this::completeVoting);
           SlayTheStreamer.log("BossSelectScreen: Mock voting started with " + array.length + " options");
         } else if (this.isVoting && !this.mayVote) {
@@ -374,23 +407,28 @@
      if (getVoter().isPresent()) {
        TwitchVoter twitchVoter = (TwitchVoter)getVoter().get();
        AbstractDungeon.topPanel.twitch.ifPresent(twitchPanel -> twitchPanel.connection.sendMessage(TEXT[4] + (twitchVoter.getOptions()[option]).displayName));
-     } 
- 
+     }
+
      
      AbstractDungeon.bossKey = (String)AbstractDungeon.bossList.get(option);
      SlayTheStreamer.bossHidden = false;
-     AbstractDungeon.closeCurrentScreen();
-     AbstractDungeon.dungeonMapScreen.open(false);
-     Settings.hideCombatElements = false;
      this.bosses.clear();
- 
-     
+     Settings.hideCombatElements = false;
+
+     // Call setBoss BEFORE opening the map to ensure boss icons are loaded correctly
      try {
        Method m = AbstractDungeon.class.getDeclaredMethod("setBoss", new Class[] { String.class });
        m.setAccessible(true);
        m.invoke(CardCrawlGame.dungeon, new Object[] { AbstractDungeon.bossKey });
+       SlayTheStreamer.log("BossSelectScreen: setBoss called with key: " + AbstractDungeon.bossKey);
      }
-     catch (Throwable throwable) {}
+     catch (Throwable throwable) {
+       SlayTheStreamer.log("BossSelectScreen: Error calling setBoss: " + throwable.getMessage());
+     }
+
+     // Close screen and open map AFTER setBoss is called
+     AbstractDungeon.closeCurrentScreen();
+     AbstractDungeon.dungeonMapScreen.open(false);
    }
  }
 

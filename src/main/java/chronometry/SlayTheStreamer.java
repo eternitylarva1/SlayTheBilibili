@@ -134,6 +134,7 @@
      
      if (!config.has("VoteOnBosses")) config.setBool("VoteOnBosses", true);
      if (!config.has("VoteOnNeow")) config.setBool("VoteOnNeow", true);
+     if (!config.has("VoteOnCards")) config.setBool("VoteOnCards", true);
      if (!config.has("MockTwitchMode")) config.setBool("MockTwitchMode", false);
      
      if (!config.has("MerchantNames")) config.setString("MerchantNames", "Casey,Anthony"); 

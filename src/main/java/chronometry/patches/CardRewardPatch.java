@@ -5,6 +5,7 @@
  import com.badlogic.gdx.graphics.Color;
  import com.badlogic.gdx.graphics.g2d.SpriteBatch;
  import com.evacipated.cardcrawl.modthespire.lib.SpirePatch;
+ import com.evacipated.cardcrawl.modthespire.lib.SpireReturn;
  import com.megacrit.cardcrawl.cards.AbstractCard;
  import com.megacrit.cardcrawl.core.CardCrawlGame;
  import com.megacrit.cardcrawl.core.Settings;
@@ -17,23 +18,23 @@
  import de.robojumper.ststwitch.TwitchVoteOption;
  import de.robojumper.ststwitch.TwitchVoter;
  import java.util.ArrayList;
-import java.util.Arrays;
+ import java.util.Arrays;
  
  public class CardRewardPatch
  {
    static boolean isVoting = false;
    static boolean mayVote = false;
-
+ 
    @SpirePatch(clz = CardRewardScreen.class, method = "renderTwitchVotes")
    public static class renderTwitchVotes {
-     public static void Postfix(CardRewardScreen self, SpriteBatch sb) {
+     public static SpireReturn<Void> Prefix(CardRewardScreen self, SpriteBatch sb) {
        sb.draw(SlayTheStreamer.startScreenImage, Settings.WIDTH / 2.0F, 0.0F, SlayTheStreamer.startScreenImage
            
            .getWidth() * Settings.scale, SlayTheStreamer.startScreenImage
            .getHeight() * Settings.scale);
        if (!isVoting) {
          SlayTheStreamer.log("CardRewardPatch: Twitch not active");
-         return;
+         return SpireReturn.Return(null);
        }
        if (MockTwitchHelper.isMockMode()) {
          SlayTheStreamer.log("CardRewardPatch: Rendering mock Twitch votes");
@@ -41,7 +42,7 @@ import java.util.Arrays;
          int[] voteCounts = MockTwitchHelper.getMockVoteCounts();
          if (options == null || voteCounts == null) {
            SlayTheStreamer.log("CardRewardPatch: Mock options or voteCounts is null");
-           return;
+           return SpireReturn.Return(null);
          }
          int sum = 0;
          for (int count : voteCounts) {
@@ -75,6 +76,7 @@ import java.util.Arrays;
        } else {
          SlayTheStreamer.log("CardRewardPatch: No voter available and mock mode is disabled");
        }
+       return SpireReturn.Return(null);
      }
    }
 
@@ -82,9 +84,11 @@ import java.util.Arrays;
    public static class openHook
    {
      public static void Postfix(CardRewardScreen self, ArrayList<AbstractCard> cards, RewardItem rItem, String header) {
-       AbstractDungeon.dynamicBanner.appear((CardCrawlGame.languagePack.getUIString("versus:ForPlayer")).TEXT[0]);
-       mayVote = true;
-       SlayTheStreamer.cardRewardPatch.updateVote();
+       if (SlayTheStreamer.config.getBool("VoteOnCards")) {
+         AbstractDungeon.dynamicBanner.appear((CardCrawlGame.languagePack.getUIString("versus:ForPlayer")).TEXT[0]);
+         mayVote = true;
+         SlayTheStreamer.cardRewardPatch.updateVote();
+       }
      }
    }
 

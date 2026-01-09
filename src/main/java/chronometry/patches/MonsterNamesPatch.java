@@ -52,14 +52,19 @@
        if (voterOpt.isPresent()) {
          TwitchVoter twitchVoter = voterOpt.get();
          votedUsernames = (Set)ReflectionHacks.getPrivate(twitchVoter, TwitchVoter.class, "votedUsernames");
+         SlayTheStreamer.log("MonsterNamesPatch: Using real Twitch voter, votedUsernames size: " + votedUsernames.size());
        }
        // 如果没有真实的 TwitchVoter，使用模拟模式
        else if (MockTwitchHelper.isMockMode()) {
          votedUsernames = MockTwitchHelper.getMockVotedUsernames();
+         SlayTheStreamer.log("MonsterNamesPatch: Using mock mode, votedUsernames size: " + votedUsernames.size());
+       } else {
+         SlayTheStreamer.log("MonsterNamesPatch: No voter available and mock mode is disabled");
        }
 
        // 如果没有可用的投票用户名，保持怪物原始名称
        if (votedUsernames == null || votedUsernames.size() == 0) {
+         SlayTheStreamer.log("MonsterNamesPatch: No voted usernames available, keeping original name: " + name);
          return;
        }
        
